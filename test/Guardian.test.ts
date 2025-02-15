@@ -1,5 +1,6 @@
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import "@nomicfoundation/hardhat-chai-matchers";
+const { ethers } = require("hardhat");
 
 describe("Guardian Contract", function () {
   it("Should deploy Guardian and store the AVS public key", async function () {

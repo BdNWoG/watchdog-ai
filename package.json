@@ -21,18 +21,24 @@
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@typechain/hardhat": "^9.1.0",
     "@types/chai": "^5.0.1",
+    "@types/chai-as-promised": "^8.0.1",
     "@types/express": "^5.0.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.13.4",
     "chai": "^4.5.0",
     "ethers": "^6.13.5",
     "hardhat": "^2.22.18",
+    "install": "^0.13.0",
     "mocha": "^11.1.0",
+    "npm": "^10.9.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   },
   "dependencies": {
     "@flashbots/ethers-provider-bundle": "^1.0.0",
+    "axios": "^1.7.9",
+    "chai-as-promised": "^8.0.1",
+    "chai-ethers": "^0.0.1",
     "dotenv": "^16.4.7",
     "express": "^4.21.2"
   }
