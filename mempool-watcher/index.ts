@@ -70,7 +70,7 @@ async function classifyViaAVS(tokenAddress: string, functionSignature: string) {
   return resp.data; // { classification: "MALICIOUS" or "SAFE", signature: "0x..." }
 }
 
-async function frontRun(malTx: providers.TransactionResponse, tokenAddress: string, avsSignature: string) {
+async function frontRun(malTx: ethers.providers.TransactionResponse, tokenAddress: string, avsSignature: string) {
   const blockNumber = await provider.getBlockNumber();
   console.log("Submitting front-run bundle for block:", blockNumber + 1);
 
@@ -106,6 +106,11 @@ async function frontRun(malTx: providers.TransactionResponse, tokenAddress: stri
 
   const bundleResponse = await flashbotsProvider.sendRawBundle(signedTransactions, blockNumber + 1);
   console.log("Flashbots bundle submitted. Waiting...");
+
+  if ("error" in bundleResponse) {
+    console.error("Error sending raw bundle:", bundleResponse.error);
+    return;
+  }
 
   const bundleResolution = await bundleResponse.wait();
   console.log("Bundle resolution:", bundleResolution);

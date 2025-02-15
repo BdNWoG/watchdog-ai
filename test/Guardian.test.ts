@@ -1,5 +1,10 @@
-import { expect } from "chai";
+import { expect, use } from "chai";
 import "@nomicfoundation/hardhat-chai-matchers";
+import { solidity } from "ethereum-waffle";
+use(solidity);
+import chaiAsPromised from "chai-as-promised";
+
+use(chaiAsPromised);
 const { ethers } = require("hardhat");
 
 describe("Guardian Contract", function () {

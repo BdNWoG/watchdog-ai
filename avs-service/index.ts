@@ -1,40 +1,38 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import { ethers } from "ethers";
 
 const app = express();
 app.use(express.json());
 
-// Private key for demonstration. DO NOT USE IN PRODUCTION.
-const AVS_PRIVATE_KEY = "0x59c6995e998f97a5a...123456789abcdefabcde00000"; 
+const AVS_PRIVATE_KEY = "...";
 const avsWallet = new ethers.Wallet(AVS_PRIVATE_KEY);
 
-// Basic check to see if transaction data is suspicious
 function isSuspicious(fnSig: string): boolean {
-  // Example: if it includes "rugPull"
   return fnSig.includes("rugPull") || fnSig.includes("removeLiquidity");
 }
 
-app.post("/classify", async (req, res) => {
+app.post("/classify", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { functionSignature, tokenAddress } = req.body;
 
-    // Simple classification
     let classification = "SAFE";
     if (isSuspicious(functionSignature)) {
       classification = "MALICIOUS";
     }
 
-    // Construct message hash: keccak256(tokenAddress + classification)
-    const msgHash = ethers.utils.solidityKeccak256(["address", "string"], [tokenAddress, classification]);
+    const msgHash = ethers.utils.solidityKeccak256(
+      ["address", "string"],
+      [tokenAddress, classification]
+    );
 
-    // Sign the raw bytes of the msgHash
     const signature = await avsWallet.signMessage(ethers.utils.arrayify(msgHash));
 
+    // Return the result
     return res.json({
       classification,
-      signature
+      signature,
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error(err);
     return res.status(500).json({ error: (err as Error).message });
   }
