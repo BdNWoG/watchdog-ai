@@ -1,47 +1,50 @@
-import express, { Request, Response, NextFunction } from "express";
+import express, { Request, Response } from "express";
 import { ethers } from "ethers";
 
 const app = express();
 app.use(express.json());
 
-// Your private key (for demonstration only—don't hardcode real keys!)
-const AVS_PRIVATE_KEY = "0xyourprivatekeyhere";
+const AVS_PRIVATE_KEY = "0xyourprivatekey";
 const avsWallet = new ethers.Wallet(AVS_PRIVATE_KEY);
 
-function isSuspicious(fnSig: string): boolean {
-  return fnSig.includes("rugPull") || fnSig.includes("removeLiquidity");
+/** 
+ * Suppose your mempool watcher sends:
+ *  {
+ *    "functionSignature": "mint",
+ *    "tokenAddress": "0x...someToken"
+ *  }
+ * We'll classify it as MALICIOUS if it's in a known malicious list.
+ */
+function classifySignature(fnSig: string): "SAFE" | "MALICIOUS" {
+  const maliciousMethods = [
+    "rugPull",
+    "removeLiquidity",
+    "setTaxFee",
+    "blacklist",
+    "toggleTrading",
+    "mint",
+    "transferOwnership"
+  ];
+
+  if (maliciousMethods.includes(fnSig)) {
+    return "MALICIOUS";
+  }
+  return "SAFE";
 }
 
-// Define ONLY ONE handler for /classify
-app.post(
-  "/classify",
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { functionSignature, tokenAddress } = req.body;
+app.post("/classify", async (req: Request, res: Response) => {
+  const { functionSignature, tokenAddress } = req.body;
 
-      // Basic classification
-      let classification = "SAFE";
-      if (isSuspicious(functionSignature)) {
-        classification = "MALICIOUS";
-      }
+  const classification = classifySignature(functionSignature);
+  // Now we sign tokenAddress + functionSignature + classification
+  const msgHash = ethers.utils.solidityKeccak256(
+    ["address", "string", "string"],
+    [tokenAddress, functionSignature, classification]
+  );
+  const signature = await avsWallet.signMessage(ethers.utils.arrayify(msgHash));
 
-      // Build and sign a hash
-      const msgHash = ethers.utils.solidityKeccak256(
-        ["address", "string"],
-        [tokenAddress, classification]
-      );
-      const signature = await avsWallet.signMessage(
-        ethers.utils.arrayify(msgHash)
-      );
-
-      // Send JSON response (no need to "return")
-      res.json({ classification, signature });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: (err as Error).message });
-    }
-  }
-);
+  res.json({ classification, signature });
+});
 
 app.listen(3001, () => {
   console.log("Mock AVS Service running on http://localhost:3001");
