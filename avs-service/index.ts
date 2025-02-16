@@ -2,6 +2,9 @@ import express, { Request, Response } from "express";
 import { ethers } from "ethers";
 import axios from "axios";
 
+import dotenv from "dotenv";
+dotenv.config();
+
 /**
  * ENV Variables:
  *  - AVS_PRIVATE_KEY: The private key for signing classification results
