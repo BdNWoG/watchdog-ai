@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 
-// Minimal ABI for Guardian: just the functions/events we need
+// Minimal Guardian ABI for example
 const GUARDIAN_ABI = [
   "function avsPublicKey() view returns (address)",
   "function autoRemoveLiquidity(address, bytes) external",
@@ -14,46 +14,40 @@ function App() {
   // ----------------------------------------------------------------------
   const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null);
   const [signer, setSigner] = useState<ethers.Signer | null>(null);
-  const [account, setAccount] = useState<string>("");
+  const [account, setAccount] = useState("");
 
   // ----------------------------------------------------------------------
-  // Guardian Contract State
+  // Guardian Contract
   // ----------------------------------------------------------------------
-  const [guardianAddress, setGuardianAddress] = useState<string>("0xYourDeployedGuardianAddress"); 
+  const [guardianAddress, setGuardianAddress] = useState("0xYourGuardianAddress");
   const [guardianContract, setGuardianContract] = useState<ethers.Contract | null>(null);
-
-  // Data from the contract
   const [avsPubKey, setAvsPubKey] = useState<string>("");
 
   // ----------------------------------------------------------------------
-  // Events and Logs
+  // Token Creation + Rug Actions (Right Column)
   // ----------------------------------------------------------------------
-  const [eventLogs, setEventLogs] = useState<string[]>([]);
-  const [mempoolLogs, setMempoolLogs] = useState<string[]>([]);
+  const [createdToken, setCreatedToken] = useState<string>(""); // address of minted token
+  const [liquidityRemoved, setLiquidityRemoved] = useState<boolean>(false);
 
   // ----------------------------------------------------------------------
-  // AVS Classification Results
+  // AVS Risk Analysis (Left Column)
   // ----------------------------------------------------------------------
-  const [functionSignature, setFunctionSignature] = useState("");
-  const [tokenAddress, setTokenAddress] = useState("");
-  const [deployerRep, setDeployerRep] = useState("");
-  const [liquidityInfo, setLiquidityInfo] = useState("");
-  const [creationDate, setCreationDate] = useState("");
-  const [codeAnalysis, setCodeAnalysis] = useState("");
-  const [recentTx, setRecentTx] = useState("");
-
+  const [tokenToAnalyze, setTokenToAnalyze] = useState("");
   const [classification, setClassification] = useState("");
   const [riskScore, setRiskScore] = useState<number | null>(null);
-  const [avsError, setAvsError] = useState<string>("");
+  const [avsError, setAvsError] = useState("");
+
+  // Mempool logs (front-run monitor, etc.)
+  const [mempoolLogs, setMempoolLogs] = useState<string[]>([]);
+  const [eventLogs, setEventLogs] = useState<string[]>([]);
 
   // ----------------------------------------------------------------------
-  // 1. Detect Metamask on mount
+  // 1. Detect Metamask
   // ----------------------------------------------------------------------
   useEffect(() => {
     if ((window as any).ethereum) {
       const tempProvider = new ethers.providers.Web3Provider((window as any).ethereum);
       setProvider(tempProvider);
-      console.log("Metamask provider detected.");
     } else {
       console.warn("No Metamask detected.");
     }
@@ -78,7 +72,7 @@ function App() {
   };
 
   // ----------------------------------------------------------------------
-  // 3. Create Guardian Contract instance whenever signer or address changes
+  // 3. Create Guardian Contract Instance
   // ----------------------------------------------------------------------
   useEffect(() => {
     if (!signer || !guardianAddress) {
@@ -95,15 +89,15 @@ function App() {
   }, [signer, guardianAddress]);
 
   // ----------------------------------------------------------------------
-  // 4. Listen for AutoRemovedLiquidity event
+  // 4. Guardian Events
   // ----------------------------------------------------------------------
   useEffect(() => {
     if (!guardianContract) return;
 
-    const handleAutoRemoved = (token: string, caller: string, event: any) => {
-      const msg = `AutoRemovedLiquidity: token=${token}, caller=${caller}, block=${event.blockNumber}`;
+    const handleAutoRemoved = (token: string, caller: string, evt: any) => {
+      const msg = `AutoRemovedLiquidity: token=${token}, caller=${caller}, block=${evt.blockNumber}`;
       setEventLogs((prev) => [...prev, msg]);
-      console.log("AutoRemovedLiquidity event =>", msg);
+      console.log(msg);
     };
 
     guardianContract.on("AutoRemovedLiquidity", handleAutoRemoved);
@@ -114,7 +108,31 @@ function App() {
   }, [guardianContract]);
 
   // ----------------------------------------------------------------------
-  // 5. Fetch AVS Public Key
+  // 5. (Optional) Mempool Watcher
+  // ----------------------------------------------------------------------
+  useEffect(() => {
+    // Connect to a mempool-watcher ws if you have one
+    const wsUrl = "ws://localhost:4000";
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => console.log(`Connected to mempool watcher at ${wsUrl}`);
+    ws.onmessage = (msg) => {
+      try {
+        const data = JSON.parse(msg.data);
+        const logMsg = `Event: ${data.event}, txHash=${data.txHash}, from=${data.txFrom}`;
+        setMempoolLogs((prev) => [...prev, logMsg]);
+      } catch (err) {
+        console.error("Failed to parse WS message", err);
+      }
+    };
+    ws.onerror = (err) => console.error("WebSocket error:", err);
+    ws.onclose = () => console.log("WebSocket closed.");
+
+    return () => ws.close();
+  }, []);
+
+  // ----------------------------------------------------------------------
+  // Guardian: fetch AVS public key
   // ----------------------------------------------------------------------
   const fetchAvsKey = async () => {
     if (!guardianContract) return;
@@ -128,75 +146,75 @@ function App() {
   };
 
   // ----------------------------------------------------------------------
-  // 6. Call autoRemoveLiquidity (demo function)
+  // (Right) 1. Create Token
   // ----------------------------------------------------------------------
-  const callRemoveLiquidity = async () => {
-    if (!guardianContract) return;
+  const createToken = async () => {
+    if (!signer) return;
     try {
-      const tokenAddr = "0x0000000000000000000000000000000000000000";
-      const dummySignature = "0x1234"; // example signature
-      const tx = await guardianContract.autoRemoveLiquidity(tokenAddr, dummySignature);
-      console.log("Tx sent:", tx.hash);
-      const receipt = await tx.wait();
-      console.log("Tx mined:", receipt.transactionHash);
+      // For demonstration, you'd call your "ScamTokenFactory" or something similar:
+      // e.g. const factory = await ethers.getContractFactory("ScamToken", signer);
+      // const token = await factory.deploy();
+      // await token.deployed();
+      // setCreatedToken(token.address);
+      // console.log("New Token Deployed at:", token.address);
+      // 
+      // For now, just a placeholder:
+      const fakeTokenAddr = "0xNewlyMintedToken...";
+      setCreatedToken(fakeTokenAddr);
+      console.log("Created new token at:", fakeTokenAddr);
     } catch (err) {
-      console.error("Error calling removeLiquidity:", err);
+      console.error("Error creating token:", err);
     }
   };
 
   // ----------------------------------------------------------------------
-  // 7. Subscribe to Mempool Logs (Optional WebSocket)
+  // (Right) 2. Add Token to Metamask
   // ----------------------------------------------------------------------
-  useEffect(() => {
-    // If you have a local WebSocket from your mempool watcher
-    // e.g. ws://localhost:4000
-    const wsUrl = "ws://localhost:4000";
-    const ws = new WebSocket(wsUrl);
-
-    ws.onopen = () => {
-      console.log(`Connected to mempool watcher at ${wsUrl}`);
-    };
-    ws.onmessage = (msg) => {
-      try {
-        const data = JSON.parse(msg.data);
-        const logMsg = `Event: ${data.event}, txHash=${data.txHash}, from=${data.txFrom}`;
-        setMempoolLogs((prev) => [...prev, logMsg]);
-      } catch (err) {
-        console.error("Failed to parse WS message", err);
-      }
-    };
-    ws.onerror = (err) => {
-      console.error("WebSocket error:", err);
-    };
-    ws.onclose = () => {
-      console.log("WebSocket connection closed.");
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, []);
-
-  // ----------------------------------------------------------------------
-  // 8. Test AVS Classification (POST to your Express server)
-  // ----------------------------------------------------------------------
-  const handleAvsSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAvsError("");
-    setClassification("");
-    setRiskScore(null);
-
+  const addTokenToMetamask = async () => {
+    if (!provider || !createdToken) return;
     try {
+      // Example: if your newly minted token is an ERC-20
+      // you can call ethereum.request({ method: 'wallet_watchAsset', params: {...} })
+      const tokenSymbol = "SCAM";
+      const tokenDecimals = 18;
+
+      await (window as any).ethereum.request({
+        method: "wallet_watchAsset",
+        params: {
+          type: "ERC20",
+          options: {
+            address: createdToken,
+            symbol: tokenSymbol,
+            decimals: tokenDecimals,
+          },
+        },
+      });
+      console.log("Token added to Metamask:", createdToken);
+    } catch (err) {
+      console.error("Failed to add token:", err);
+    }
+  };
+
+  // ----------------------------------------------------------------------
+  // (Left) Analyze Token with AVS
+  // ----------------------------------------------------------------------
+  const analyzeTokenRisk = async () => {
+    try {
+      setAvsError("");
+      setClassification("");
+      setRiskScore(null);
+
       const payload = {
-        functionSignature,
-        tokenAddress,
-        deployerReputation: deployerRep,
-        liquidityInfo,
-        creationDate,
-        codeAnalysis,
-        recentTxHistory: recentTx,
+        functionSignature: "mint", // or something relevant
+        tokenAddress: tokenToAnalyze,
+        deployerReputation: "Brand new deployer, likely suspicious",
+        liquidityInfo: "No liquidity lock found",
+        creationDate: "Just minted",
+        codeAnalysis: "Minimal code, no real logic",
+        recentTxHistory: "None, just deployed",
       };
 
+      // Post to your AVS service
       const res = await fetch("http://localhost:3001/classify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -205,7 +223,7 @@ function App() {
 
       const json = await res.json();
       if (!res.ok) {
-        setAvsError(json.error || "Error occurred");
+        setAvsError(json.error || "AVS error");
       } else {
         setClassification(json.classification);
         setRiskScore(json.riskScore);
@@ -216,160 +234,44 @@ function App() {
   };
 
   // ----------------------------------------------------------------------
+  // (Right) 3. Rug the Coin (Remove Liquidity)
+  // ----------------------------------------------------------------------
+  const rugCoin = async () => {
+    // This is a placeholder for calling your "removeLiquidity" method 
+    // on a real ScamToken or DEX contract. 
+    // We'll just set a flag to simulate user attempted a rug.
+    console.log("User attempted to remove liquidity. Mempool watcher might front-run now...");
+    setLiquidityRemoved(true);
+  };
+
+  // ----------------------------------------------------------------------
   // Render
   // ----------------------------------------------------------------------
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
-      <h2 style={{ textAlign: "center" }}>WatchDog AI Frontend</h2>
+    <div style={styles.container}>
 
-      {/* ----------------- Wallet Connection ----------------- */}
-      <div style={{ marginBottom: 20 }}>
-        {!account ? (
-          <button onClick={connectWallet} style={styles.btn}>
-            Connect Metamask
-          </button>
-        ) : (
-          <p>Wallet Connected: <b>{account}</b></p>
-        )}
-      </div>
-
-      {/* ----------------- Guardian Contract Input ----------------- */}
-      <div>
-        <label>Guardian Contract Address: </label>
-        <input
-          style={styles.input}
-          type="text"
-          value={guardianAddress}
-          onChange={(e) => setGuardianAddress(e.target.value)}
-        />
-      </div>
-
-      {/* ----------------- AVS Public Key Retrieval ----------------- */}
-      <div style={{ marginTop: 10 }}>
-        <button onClick={fetchAvsKey} disabled={!guardianContract} style={styles.btn}>
-          Fetch AVS Public Key
-        </button>
-        {avsPubKey && <p>AVS Public Key: <b>{avsPubKey}</b></p>}
-      </div>
-
-      {/* ----------------- autoRemoveLiquidity Call ----------------- */}
-      <div style={{ marginTop: 10 }}>
-        <button onClick={callRemoveLiquidity} disabled={!guardianContract} style={styles.btn}>
-          Call autoRemoveLiquidity (Demo)
-        </button>
-      </div>
-
-      <hr style={styles.hr} />
-
-      {/* ----------------- Guardian Events Log ----------------- */}
-      <h3>Guardian Contract Events</h3>
-      {eventLogs.length === 0 && <p>No events yet...</p>}
-      <ul>
-        {eventLogs.map((log, idx) => (
-          <li key={idx}>{log}</li>
-        ))}
-      </ul>
-
-      <hr style={styles.hr} />
-
-      {/* ----------------- Mempool Logs (Optional) ----------------- */}
-      <h3>Mempool Watcher Logs (WebSocket)</h3>
-      {mempoolLogs.length === 0 && <p>No mempool logs yet...</p>}
-      <ul>
-        {mempoolLogs.map((log, idx) => (
-          <li key={idx}>{log}</li>
-        ))}
-      </ul>
-
-      <hr style={styles.hr} />
-
-      {/* ----------------- AVS Classification Tester ----------------- */}
-      <h3>Test AVS Classification</h3>
-      <form onSubmit={handleAvsSubmit} style={styles.form}>
-        <div style={styles.formGroup}>
-          <label>Function Signature</label>
+      {/* ---------------- LEFT COLUMN: Risk Analysis & Mempool Logs ---------------- */}
+      <div style={styles.leftColumn}>
+        <h3>Token Risk Analysis</h3>
+        <div style={{ marginBottom: 10 }}>
+          <label>Token Address to Analyze: </label>
           <input
             style={styles.input}
-            value={functionSignature}
-            onChange={(e) => setFunctionSignature(e.target.value)}
-            placeholder="e.g. removeLiquidity"
-          />
-        </div>
-
-        <div style={styles.formGroup}>
-          <label>Token Address</label>
-          <input
-            style={styles.input}
-            value={tokenAddress}
-            onChange={(e) => setTokenAddress(e.target.value)}
+            type="text"
+            value={tokenToAnalyze}
+            onChange={(e) => setTokenToAnalyze(e.target.value)}
             placeholder="0x1234..."
           />
+          <button onClick={analyzeTokenRisk} style={styles.btn}>
+            Analyze
+          </button>
         </div>
 
-        <div style={styles.formGroup}>
-          <label>Deployer Reputation</label>
-          <input
-            style={styles.input}
-            value={deployerRep}
-            onChange={(e) => setDeployerRep(e.target.value)}
-            placeholder="Deployer known for 2 rug pulls?"
-          />
-        </div>
-
-        <div style={styles.formGroup}>
-          <label>Liquidity Info</label>
-          <input
-            style={styles.input}
-            value={liquidityInfo}
-            onChange={(e) => setLiquidityInfo(e.target.value)}
-            placeholder="No lock found..."
-          />
-        </div>
-
-        <div style={styles.formGroup}>
-          <label>Creation Date</label>
-          <input
-            style={styles.input}
-            value={creationDate}
-            onChange={(e) => setCreationDate(e.target.value)}
-            placeholder="Brand new, deployed 1 day ago"
-          />
-        </div>
-
-        <div style={styles.formGroup}>
-          <label>Code Analysis</label>
-          <input
-            style={styles.input}
-            value={codeAnalysis}
-            onChange={(e) => setCodeAnalysis(e.target.value)}
-            placeholder="Suspected reentrancy..."
-          />
-        </div>
-
-        <div style={styles.formGroup}>
-          <label>Recent Tx History</label>
-          <input
-            style={styles.input}
-            value={recentTx}
-            onChange={(e) => setRecentTx(e.target.value)}
-            placeholder="Multiple large mints..."
-          />
-        </div>
-
-        <button type="submit" style={{ ...styles.btn, marginTop: 10 }}>
-          Submit to AVS
-        </button>
-      </form>
-
-      {/* ----------------- Display AVS Classification Result ----------------- */}
-      <div style={{ marginTop: 20 }}>
         {avsError && <p style={{ color: "red" }}>Error: {avsError}</p>}
-
         {classification && riskScore !== null && (
           <div style={{ marginTop: 10 }}>
             <p>Classification: <b>{classification}</b></p>
             <p>Risk Score: <b>{riskScore}%</b></p>
-
             <div style={styles.riskBarContainer}>
               <div
                 style={{
@@ -384,46 +286,125 @@ function App() {
             </div>
           </div>
         )}
+
+        <hr style={styles.hr} />
+
+        <h3>Mempool / Front-Run Logs</h3>
+        <div style={{ marginBottom: 10 }}>
+          <p>Monitoring for suspicious liquidity removals...</p>
+        </div>
+        {mempoolLogs.length === 0 && <p>No mempool logs yet...</p>}
+        <ul>
+          {mempoolLogs.map((log, idx) => (
+            <li key={idx}>{log}</li>
+          ))}
+        </ul>
+      </div>
+
+      {/* ---------------- RIGHT COLUMN: Metamask, Token Creation, Rug Attempt ---------------- */}
+      <div style={styles.rightColumn}>
+        <h3>Metamask & Token Actions</h3>
+
+        {!account ? (
+          <button onClick={connectWallet} style={styles.btn}>
+            Connect Metamask
+          </button>
+        ) : (
+          <p>Connected: <b>{account}</b></p>
+        )}
+
+        <div style={{ marginTop: 10 }}>
+          <label>Guardian Contract Address:</label>
+          <input
+            style={styles.input}
+            type="text"
+            value={guardianAddress}
+            onChange={(e) => setGuardianAddress(e.target.value)}
+          />
+        </div>
+
+        <div style={{ marginTop: 10 }}>
+          <button onClick={fetchAvsKey} disabled={!guardianContract} style={styles.btn}>
+            Fetch AVS Public Key
+          </button>
+          {avsPubKey && <p>AVS Key: <b>{avsPubKey}</b></p>}
+        </div>
+
+        <hr style={styles.hr} />
+
+        <h4>Create Token</h4>
+        <p>(Scam-like token for demonstration)</p>
+        <button onClick={createToken} style={styles.btn}>
+          Create Token
+        </button>
+        {createdToken && (
+          <div style={{ marginTop: 5 }}>
+            <p>New Token: <b>{createdToken}</b></p>
+            <button onClick={addTokenToMetamask} style={styles.btn}>
+              Add to Metamask
+            </button>
+          </div>
+        )}
+
+        <hr style={styles.hr} />
+
+        <h4>Rug the Coin</h4>
+        <button onClick={rugCoin} style={styles.btn} disabled={!createdToken}>
+          Remove Liquidity (Rug)
+        </button>
+        {liquidityRemoved && <p style={{ color: "red" }}>Liquidity removal attempted!</p>}
+
+        <hr style={styles.hr} />
+
+        <h4>Guardian Contract Events</h4>
+        {eventLogs.length === 0 && <p>No events yet...</p>}
+        <ul>
+          {eventLogs.map((log, idx) => (
+            <li key={idx}>{log}</li>
+          ))}
+        </ul>
       </div>
     </div>
   );
 }
 
-// ----------------------------------------------------------------------
-// Basic inline CSS for a "clean & sleek" look
-// Feel free to convert to a real CSS file or Tailwind
-// ----------------------------------------------------------------------
+// Styles
 const styles: Record<string, React.CSSProperties> = {
+  container: {
+    display: "flex",
+    flexDirection: "row",
+    width: "100%",
+    minHeight: "100vh",
+    fontFamily: "Arial, sans-serif",
+  },
+  leftColumn: {
+    flex: 1,
+    borderRight: "1px solid #ccc",
+    padding: "20px",
+  },
+  rightColumn: {
+    flex: 1,
+    padding: "20px",
+  },
   btn: {
-    padding: "8px 16px",
-    border: "none",
+    padding: "6px 12px",
     backgroundColor: "#2196f3",
     color: "#fff",
+    border: "none",
     borderRadius: "4px",
     cursor: "pointer",
-    marginRight: "8px",
+    marginLeft: "8px",
   },
   input: {
     marginLeft: "6px",
-    padding: "6px",
+    padding: "4px",
     borderRadius: "4px",
     border: "1px solid #ccc",
-    width: "280px",
   },
   hr: {
     margin: "20px 0",
     border: "none",
     borderBottom: "1px solid #ccc",
-  },
-  form: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "10px",
-    maxWidth: "600px",
-  },
-  formGroup: {
-    display: "flex",
-    flexDirection: "column",
   },
   riskBarContainer: {
     backgroundColor: "#ddd",
